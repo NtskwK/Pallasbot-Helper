@@ -1,0 +1,15 @@
+# main
+nb-cli
+nonebot-adapter-onebot~=2.0.0b1
+
+# # tests
+# pytest~=7.1.2
+
+# greeting
+requests-html~=0.10.0
+
+# repeater
+pydantic~=1.9.0
+pymongo~=3.12.1
+jieba-fast~=0.53
+pypinyin~=0.41.0

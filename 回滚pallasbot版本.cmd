@@ -1,7 +1,7 @@
 @echo off
 cd %~dp0
 if not exist main.ps1 (
-	echo 未找到一份有效的 PallasBot 安装（是否已经解压？）
+	echo 未找到一份有效的Mirai Dice 安装（是否已经解压？）
 	pause
 	goto :EOF
 )
