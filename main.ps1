@@ -1,17 +1,27 @@
-﻿$Host.UI.RawUI.WindowTitle = 'PallasHelper'
+﻿If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator"))
+{  
+	$arguments ="& '" + $myinvocation.mycommand.definition +"'"+"$args[0]"
+	Start-Process powershell -Verb runAs -ArgumentList $arguments 
+	exit
+}
+
+
+$Host.UI.RawUI.WindowTitle = 'PallasHelper'
 
 Write-Host "欢迎使用PallasBotHelper"
 Write-Host "正在检测 PallasBoty 和 Pallas-Bot 必须的依赖项"
 
 $PythonURL = "https://repo.huaweicloud.com/python/3.9.9/python-3.9.9.exe"
 $GitURL = "https://repo.huaweicloud.com/git-for-windows/v2.37.1.windows.1/MinGit-2.37.1-32-bit.zip"
-$GetPipURL = "https://bootstrap.pypa.io/get-pip.py"
 $MongodbURL = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-6.0.0-signed.msi"
-$CppURL = "https://myvs.download.prss.microsoft.com/dbazure/mu_visual_cpp_build_tools_2015_update_3_x64_dvd_dfd9a39c.iso?t=2d9c8bc8-eb35-4d1f-a0e2-962fc2463acc&e=1660583046&h=95cab42736b0cd8ed7679c6ee95d6b00c939abf58473188a97e3cc339535f81b&su=1"
+$CppURL = "https://myvs.download.prss.microsoft.com/dbazure/mu_visual_cpp_build_tools_2015_update_3_x64_dvd_dfd9a39c.iso?t=2d9c8bc8-eb35-4d1f-a0e2-962fc2463acc'&'e=1660583046'&'h=95cab42736b0cd8ed7679c6ee95d6b00c939abf58473188a97e3cc339535f81b'&'su=1"
+$FfmpegURL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
+$ZipURL = "https://www.7-zip.org/a/7zr.exe"
 
 $PYTHON = ""
 $GIT = ""
-$PIP = ""
+$FFMPEG = ""
+$7ZR = ""
 
 # 尝试开启Tls1.2
 if (-Not [System.Net.SecurityProtocolType]::Tls12)
@@ -97,36 +107,39 @@ if (-Not (Test-Path -LiteralPath "$PSScriptRoot\nonebotPallas\.git" -PathType Co
 	Write-Host "你可以通过尝试使用脚本重新安装以解决此问题" -ForegroundColor red
 }
 
-#检查7zr
+#解压文件
 Try 
 {
 	Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
 	function Unzip
 	{
 		param([string]$zipfile, [string]$outpath)
+		Try{
+			[System.IO.Compression.ZipFile]::ExtractToDirectory($zipfile, $outpath)
+		}Catch{
+			if (-Not (Test-Path -Path "$PSScriptRoot\app\7zr.exe" -PathType Leaf))
+			{
+				Write-Host "正在下载7zr"
+				DownloadFile $ZipURL "$PSScriptRoot\app\7zr.exe"
+			}
+			
+			if (-Not (Test-Path -Path "$PSScriptRoot\app\7zr.exe" -PathType Leaf))
+			{
+				Write-Host "无法加载7zr" -ForegroundColor red
+				Exit
+			}
+			
+			$7ZR = "$PSScriptRoot\app\7zr.exe"
+		
+			& $7ZR x $zipfile -o"$outpath"
+			
+		}
 
-		[System.IO.Compression.ZipFile]::ExtractToDirectory($zipfile, $outpath)
 	}
 }
-Catch {
-	if (-Not (Test-Path -LiteralPath "$PSScriptRoot\app\unzip.exe" -PathType Leaf))
-	{
-		$ZipURL = "https://www.7-zip.org/a/7zr.exe"
-		DownloadFile $ZipURL "$PSScriptRoot\app\7zr.exe"
-	}
-	
-	if (-Not (Test-Path -LiteralPath "$PSScriptRoot\app\7zr.exe" -PathType Leaf))
-	{
-		Write-Host "无法加载7zr" -ForegroundColor red
-		Exit
-	}
-	
-	function Unzip
-	{
-		param([string]$zipfile, [string]$outpath)
-
-		& $PSScriptRoot\app\unzip.exe $zipfile -d $outpath
-	}
+Catch
+{
+	Write-Host "出现了未知的异常"
 }
 
 
@@ -165,34 +178,34 @@ Write-Host "Python: $PYTHON" -ForegroundColor green
 
 
 
-function CheckGit(){	
-	Write-Host "检测Git"
-	Try{
-		$Command = Get-Command -Name git -ErrorAction Stop
-		$GIT = "git"
-	}Catch {}
 
-	Try{
+Write-Host "检测Git"
+Try{
+	$Command = Get-Command -Name git -ErrorAction Stop
+	$GIT = "git"
+}Catch {}
+
+Try{
+	$Command = Get-Command -Name "$PSScriptRoot\app\git\cmd\git" -ErrorAction Stop
+	$GIT = "$PSScriptRoot\app\git\cmd\git"
+}
+Catch {}
+
+if ($GIT -eq "")
+{
+	DownloadFile $GitURL "$PSScriptRoot\app\git.zip"
+	Remove-Item -LiteralPath "$PSScriptRoot\app\git\" -Recurse -ErrorAction SilentlyContinue
+	Unzip "$PSScriptRoot\git.zip" "$PSScriptRoot\app\git\"
+	Remove-Item -LiteralPath "$PSScriptRoot\app\git.zip" -ErrorAction SilentlyContinue
+	Try {
 		$Command = Get-Command -Name "$PSScriptRoot\app\git\cmd\git" -ErrorAction Stop
 		$GIT = "$PSScriptRoot\app\git\cmd\git"
-	}
-	Catch {}
-
-	if ($GIT -eq "")
-	{
-		DownloadFile $GitURL "$PSScriptRoot\app\git.zip"
-		Remove-Item -LiteralPath "$PSScriptRoot\app\git\" -Recurse -ErrorAction SilentlyContinue
-		Unzip "$PSScriptRoot\git.zip" "$PSScriptRoot\app\git\"
-		Remove-Item -LiteralPath "$PSScriptRoot\app\git.zip" -ErrorAction SilentlyContinue
-		Try {
-			$Command = Get-Command -Name "$PSScriptRoot\app\git\cmd\git" -ErrorAction Stop
-			$GIT = "$PSScriptRoot\app\git\cmd\git"
-		}Catch {
-			Write-Host "无法加载Git!" -ForegroundColor red
-			Exit
-		}
+	}Catch {
+		Write-Host "无法加载Git!" -ForegroundColor red
+		Exit
 	}
 }
+
 
 #检测Pallas-Bot
 if (-Not (Test-Path -Path ".\nonebotPallas\bot.py" -PathType Leaf))
@@ -202,37 +215,72 @@ if (-Not (Test-Path -Path ".\nonebotPallas\bot.py" -PathType Leaf))
 }
 
 
-#脚本修改自 Dice! by w4123Suhui
 Write-Host "Git: $GIT" -ForegroundColor green
 cd "$PSScriptRoot\nonebotPallas"
 if (($args[0] -eq "--update") -or ($args[0] -eq "-u"))
 {
-	CheckGit
+
 	& "$GIT" fetch --depth=1
 	& "$GIT" reset --hard origin/master
 	Write-Host "更新操作已执行完毕" -ForegroundColor green
+
 }
 elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-r"))
 {
-	CheckGit
+
 	& "$GIT" reset --hard "HEAD@{1}"
 	Write-Host "回滚操作已执行完毕" -ForegroundColor green
+
 }
 elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 {
+
+	Write-Host "检测ffmpeg"
+	Try{
+		$Command = Get-Command -Name ffmpeg -ErrorAction Stop
+		$FFMPEG = "ffmpeg"
+	}Catch {}
+
+	Try{
+		$Command = Get-Command -Name "$PSScriptRoot\app\ffmpeg\bin\ffmpeg" -ErrorAction Stop
+		$FFMPEG = "$PSScriptRoot\app\ffmpeg\bin\ffmpeg"
+	}
+	Catch {}
+
+	if ($FFMPEG -eq "")
+	{
+		Write-Host "Pallas-Bot将会使用ffmpeg发送语音（如果你不希望Pallas-Bot发送语音，可以不装这个）"
+		$value = Read-Host -Prompt "请问是否需要Pallasbot-helper为博士安装ffmpeg？（[yes]/no）"
+		if( -Not ($value -match '^n')){
+			
+			Try {
+				$Command = Get-Command -Name ffmpeg -ErrorAction Stop
+				Write-Host "已在系统环境中找到ffmpeg"
+			}Catch {
+				Write-Host "开始下载ffmpeg，请耐心等待"
+				mkdir "$PSScriptRoot\app\"
+				curl -o "$PSScriptRoot\app\ffmpeg.7z" "$FfmpegURL"
+				Remove-Item -LiteralPath "$PSScriptRoot\app\ffmpeg-5.1-full_build\" -Recurse -ErrorAction SilentlyContinue
+				Unzip "$PSScriptRoot\app\ffmpeg.7z" "$PSScriptRoot\app\"
+				[Environment]::SetEnvironmentVariable("PATH", $Env:PATH + ";$PSScriptRoot\app\ffmpeg-5.1-full_build\bin", [EnvironmentVariableTarget]::Machine)
+				Write-Host "尝试将ffmpeg写入PATH"
+			}
+		}else{
+			Write-Host "跳过ffmpeg安装"
+		}
+	}
+
 	Write-Host "即将下载Microsoft Visual C++ Build Tools 14.0"
 	Write-Host "温馨提示：需要安装的是 “构建工具” 不是 “运行库” ！" -ForegroundColor red
 	$value = Read-Host -Prompt "如果你已经安装过了Microsoft Visual C++ Build Tools 14.0 ，可以输入already跳过安装（输入其他内容则将开始下载）"
 	if( -Not ($value -match '^already')){
 		Write-Host "开始下载Microsoft Visual C++ Build Tools，请耐心等待"
-		powershell curl -o "$PSScriptRoot\" "$CppURL"
+		powershell curl -o "$PSScriptRoot\visual_cpp_build_tools_2015_update_3_x64_dvd.iso" "$CppURL"
 		Write-Host "Microsoft Visual C++ Build Tools 14.0下载已完成,请按照目录内的“食用说明.pdf”所示，完成MongoDB的安装"
 	}
 
-
-
 	Write-Host "Pallas-Bot将会使用MongoDB存储数据（请务必安装MongoDB）"
-	$value = Read-Host -Prompt "请问是否需要Pallasbot-helper为博士下载MongoDB？（yes/no）"
+	$value = Read-Host -Prompt "请问是否需要Pallasbot-helper为博士下载MongoDB？（yes/[no]）"
 	if($value -match '^y'){
 		Write-Host "开始下载MongoDB，请耐心等待（这个过程大约需要3-5分钟）"
 		Write-Host "如果需要手动下载并安装MongoDB请参考以下链接"
@@ -247,14 +295,18 @@ elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 }
 else
 {
-	# python -m venv myvenv
-	# Call $PSScriptRoot\myvenv\bin\activate.bat
-	
-	#检查依赖
-	pip install -i https://mirror.baidu.com/pypi/simple -r requirements.txt
+	net start MongoDB
+
+	# Pallas-Bot自带的requirements有问题，暂时还不清楚怎么修
+	cd ..
+    python -m pip install --upgrade pip -i https://mirror.baidu.com/pypi/simple
+    pip install -i https://mirror.baidu.com/pypi/simple -r requirements.txt
+	cd "$PSScriptRoot\nonebotPallas"
+
+	nb plugin install nonebot_plugin_apscheduler
+	nb plugin install gocqhttp
+    Write-Host "正在加载$PSScriptRoot"
 	nb run
-	
-	# deactivate
 }
-Write-Host "Mongodb服务已关闭" -ForegroundColor green
-cd ..
+net stop MongoDB
+pause
