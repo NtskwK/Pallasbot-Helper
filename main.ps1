@@ -1,4 +1,12 @@
-﻿$Host.UI.RawUI.WindowTitle = 'PallasHelper'
+﻿If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator"))
+{  
+	$arguments ="& '" + $myinvocation.mycommand.definition +"'"+"$args[0]"
+	Start-Process powershell -Verb runAs -ArgumentList $arguments 
+	exit
+}
+
+
+$Host.UI.RawUI.WindowTitle = 'PallasHelper'
 
 Write-Host "欢迎使用PallasBotHelper"
 Write-Host "正在检测 PallasBoty 和 Pallas-Bot 必须的依赖项"
@@ -8,12 +16,12 @@ $GitURL = "https://repo.huaweicloud.com/git-for-windows/v2.37.1.windows.1/MinGit
 $MongodbURL = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-6.0.0-signed.msi"
 $CppURL = "https://myvs.download.prss.microsoft.com/dbazure/mu_visual_cpp_build_tools_2015_update_3_x64_dvd_dfd9a39c.iso?t=2d9c8bc8-eb35-4d1f-a0e2-962fc2463acc'&'e=1660583046'&'h=95cab42736b0cd8ed7679c6ee95d6b00c939abf58473188a97e3cc339535f81b'&'su=1"
 $FfmpegURL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
-
+$ZipURL = "https://www.7-zip.org/a/7zr.exe"
 
 $PYTHON = ""
 $GIT = ""
 $FFMPEG = ""
-
+$7ZR = ""
 
 # 尝试开启Tls1.2
 if (-Not [System.Net.SecurityProtocolType]::Tls12)
@@ -99,35 +107,39 @@ if (-Not (Test-Path -LiteralPath "$PSScriptRoot\nonebotPallas\.git" -PathType Co
 	Write-Host "你可以通过尝试使用脚本重新安装以解决此问题" -ForegroundColor red
 }
 
-#检查7zr
+#解压文件
 Try 
 {
 	Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
 	function Unzip
 	{
 		param([string]$zipfile, [string]$outpath)
+		Try{
+			[System.IO.Compression.ZipFile]::ExtractToDirectory($zipfile, $outpath)
+		}Catch{
+			if (-Not (Test-Path -Path "$PSScriptRoot\app\7zr.exe" -PathType Leaf))
+			{
+				Write-Host "正在下载7zr"
+				DownloadFile $ZipURL "$PSScriptRoot\app\7zr.exe"
+			}
+			
+			if (-Not (Test-Path -Path "$PSScriptRoot\app\7zr.exe" -PathType Leaf))
+			{
+				Write-Host "无法加载7zr" -ForegroundColor red
+				Exit
+			}
+			
+			$7ZR = "$PSScriptRoot\app\7zr.exe"
+		
+			& $7ZR x $zipfile -o"$outpath"
+			
+		}
 
-		[System.IO.Compression.ZipFile]::ExtractToDirectory($zipfile, $outpath)
 	}
-}Catch {
-	if (-Not (Test-Path -LiteralPath "$PSScriptRoot\app\unzip.exe" -PathType Leaf)){
-
-		$ZipURL = "https://www.7-zip.org/a/7zr.exe"
-		DownloadFile $ZipURL "$PSScriptRoot\app\7zr.exe"
-	}
-	
-	if (-Not (Test-Path -LiteralPath "$PSScriptRoot\app\7zr.exe" -PathType Leaf))
-	{
-		Write-Host "无法加载7zr" -ForegroundColor red
-		Exit
-	}
-	
-	function Unzip
-	{
-		param([string]$zipfile, [string]$outpath)
-
-		& $PSScriptRoot\app\unzip.exe $zipfile -d $outpath
-	}
+}
+Catch
+{
+	Write-Host "出现了未知的异常"
 }
 
 
@@ -240,19 +252,18 @@ elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 		Write-Host "Pallas-Bot将会使用ffmpeg发送语音（如果你不希望Pallas-Bot发送语音，可以不装这个）"
 		$value = Read-Host -Prompt "请问是否需要Pallasbot-helper为博士安装ffmpeg？（[yes]/no）"
 		if( -Not ($value -match '^n')){
-			Write-Host "开始下载ffmpeg，请耐心等待"
-			Try{mkdir "$PSScriptRoot\app"}Catch{}
-			curl -o "$PSScriptRoot\app\ffmpeg-5.1-full.7z" "$FfmpegURL"
-			Remove-Item -LiteralPath "$PSScriptRoot\app\ffmpeg\" -Recurse -ErrorAction SilentlyContinue
-			Unzip "$PSScriptRoot\ffmpeg-5.1-full.7z" "$PSScriptRoot\app\ffmpeg\"
-			# [Environment]::SetEnvironmentVariable("PATH", $Env:PATH + ";C:\Program Files\Scripts", [EnvironmentVariableTarget]::Machine)
+			
 			Try {
 				$Command = Get-Command -Name ffmpeg -ErrorAction Stop
-				$FFMPEG = "$PSScriptRoot\app\git\cmd\git"
-				Remove-Item -LiteralPath "$PSScriptRoot\app\ffmpeg-5.1-full.7z" -ErrorAction SilentlyContinue
+				Write-Host "已在系统环境中找到ffmpeg"
 			}Catch {
-				Write-Host "无法加载ffmpeg!" -ForegroundColor red
-				Exit
+				Write-Host "开始下载ffmpeg，请耐心等待"
+				mkdir "$PSScriptRoot\app\"
+				curl -o "$PSScriptRoot\app\ffmpeg.7z" "$FfmpegURL"
+				Remove-Item -LiteralPath "$PSScriptRoot\app\ffmpeg-5.1-full_build\" -Recurse -ErrorAction SilentlyContinue
+				Unzip "$PSScriptRoot\app\ffmpeg.7z" "$PSScriptRoot\app\"
+				[Environment]::SetEnvironmentVariable("PATH", $Env:PATH + ";$PSScriptRoot\app\ffmpeg-5.1-full_build\bin", [EnvironmentVariableTarget]::Machine)
+				Write-Host "尝试将ffmpeg写入PATH"
 			}
 		}else{
 			Write-Host "跳过ffmpeg安装"
@@ -297,5 +308,5 @@ else
     Write-Host "正在加载$PSScriptRoot"
 	nb run
 }
-Write-Host "Mongodb服务已关闭" -ForegroundColor green
-cd ..
+net stop MongoDB
+pause
