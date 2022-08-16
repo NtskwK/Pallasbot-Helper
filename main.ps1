@@ -146,15 +146,8 @@ Catch
 Write-Host "检测Python"
 Try 
 {
-	$Command = Get-Command -Name python -ErrorAction Stop
+	$Command = Get-Command -Name pip -ErrorAction Stop
 	$PYTHON = "python"
-}
-Catch {}
-
-Try 
-{
-	$Command = Get-Command -Name "$PSScriptRoot\app\python\python" -ErrorAction Stop
-	$PYTHON = "$PSScriptRoot\app\python\python"
 }
 Catch {}
 
