@@ -1,7 +1,7 @@
 @echo off
 cd %~dp0
 if not exist main.ps1 (
-	echo Î´ÕÒµ½Ò»·İÓĞĞ§µÄMirai Dice °²×°£¨ÊÇ·ñÒÑ¾­½âÑ¹£¿£©
+	echo æœªæ‰¾åˆ°ä¸€ä»½æœ‰æ•ˆçš„Mirai Dice å®‰è£…ï¼ˆæ˜¯å¦å·²ç»è§£å‹ï¼Ÿï¼‰
 	pause
 	goto :EOF
 )
@@ -12,15 +12,15 @@ if errorlevel 1 (
     set POWERSHELL_EXEC=C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
 	!POWERSHELL_EXEC! -NoLogo -NoProfile -Command exit
     if errorlevel 1 (
-        echo ¾¯¸æ£ºÕÒ²»µ½ÏµÍ³×é¼şpowershell£¬Õâ¿ÉÄÜ´ú±íÏµÍ³ÒÑ¾­Ëğ»µ¡£ÕıÔÚÊ¹ÓÃpwsh
+        echo è­¦å‘Šï¼šæ‰¾ä¸åˆ°ç³»ç»Ÿç»„ä»¶powershellï¼Œè¿™å¯èƒ½ä»£è¡¨ç³»ç»Ÿå·²ç»æŸåã€‚æ­£åœ¨ä½¿ç”¨pwsh
         set POWERSHELL_EXEC=pwsh
         !POWERSHELL_EXEC! -NoLogo -NoProfile -Command exit
         if errorlevel 1 (
             set POWERSHELL_EXEC=C:\Program Files\PowerShell\7\pwsh.exe
             !POWERSHELL_EXEC! -NoLogo -NoProfile -Command exit
             if errorlevel 1 (
-                echo ´íÎó£ºÕÒ²»µ½pwsh£¬Çë·ÃÎÊ https://aka.ms/powershell-release?tag=stable ÊÖ¶¯°²×°PowerShell 7 ºóÖØÊÔ
-                echo °´ÈÎÒâ¼üºó½«³¢ÊÔ´ò¿ªÏÂÔØÒ³Ãæ£¨Í¨³£ÄãĞèÒªÏÂÔØ²¢°²×°PowerShell-x.x.x-win-x64.msi£©
+                echo é”™è¯¯ï¼šæ‰¾ä¸åˆ°pwshï¼Œè¯·è®¿é—® https://aka.ms/powershell-release?tag=stable æ‰‹åŠ¨å®‰è£…PowerShell 7 åé‡è¯•
+                echo æŒ‰ä»»æ„é”®åå°†å°è¯•æ‰“å¼€ä¸‹è½½é¡µé¢ï¼ˆé€šå¸¸ä½ éœ€è¦ä¸‹è½½å¹¶å®‰è£…PowerShell-x.x.x-win-x64.msiï¼‰
                 pause
                 rundll32 url.dll,FileProtocolHandler https://aka.ms/powershell-release?tag=stable
                 exit
