@@ -23,6 +23,8 @@ $GIT = ""
 $FFMPEG = ""
 $7ZR = ""
 
+$DB = 0
+
 # 尝试开启Tls1.2
 if (-Not [System.Net.SecurityProtocolType]::Tls12)
 {
@@ -283,7 +285,7 @@ elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 	}else{
 		Write-Host "跳过MongoDB安装"
 	}
-
+	$DB = 1
 	Write-Host "已完成对运行环境的检查"
 }
 else
@@ -301,5 +303,8 @@ else
     Write-Host "正在加载$PSScriptRoot"
 	nb run
 }
-net stop MongoDB
+if ($DB == 0) {
+	net stop MongoDB
+}
+	
 pause
