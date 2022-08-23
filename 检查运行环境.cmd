@@ -29,7 +29,7 @@ if errorlevel 1 (
     )
 )
 
-set-ExecutionPolicy set-ExecutionPolicy Bypass
+set-ExecutionPolicy Bypass
 !POWERSHELL_EXEC! -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\main.ps1 -t
 
 

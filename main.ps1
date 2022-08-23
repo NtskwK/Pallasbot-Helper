@@ -267,7 +267,7 @@ elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 	Write-Host "温馨提示：需要安装的是 “构建工具” 不是 “运行库” ！" -ForegroundColor red
 	$value = Read-Host -Prompt "如果你已经安装过了Microsoft Visual C++ Build Tools 14.0 ，可以输入already跳过安装（输入其他内容则将开始下载）"
 	if( -Not ($value -match '^already')){
-		Write-Host "开始下载Microsoft Visual C++ Build Tools，请耐心等待"
+		Write-Host "开始下载Microsoft Visual C++ Build Tools，请耐心等待（这个过程大约需要3-15分钟，依网络状况而定）"
 		powershell curl -o "$PSScriptRoot\visual_cpp_build_tools_2015_update_3_x64_dvd.iso" "$CppURL"
 		Write-Host "Microsoft Visual C++ Build Tools 14.0下载已完成,请按照目录内的“食用说明.pdf”所示，完成MongoDB的安装"
 	}
@@ -275,7 +275,7 @@ elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 	Write-Host "Pallas-Bot将会使用MongoDB存储数据（请务必安装MongoDB）"
 	$value = Read-Host -Prompt "请问是否需要Pallasbot-helper为博士下载MongoDB？（yes/[no]）"
 	if($value -match '^y'){
-		Write-Host "开始下载MongoDB，请耐心等待（这个过程大约需要3-5分钟）"
+		Write-Host "开始下载MongoDB，请耐心等待（这个过程大约需要3-15分钟，依网络状况而定）"
 		Write-Host "如果需要手动下载并安装MongoDB请参考以下链接"
 		Write-Host "https://www.runoob.com/mongodb/mongodb-window-install.html"
 		curl -o "$PSScriptRoot\Mongodb-6.0.0-windows-amd64-setup.msi" "$MongodbURL"

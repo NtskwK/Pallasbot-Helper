@@ -28,5 +28,7 @@ if errorlevel 1 (
         )
     )
 )
+set-ExecutionPolicy Bypass
 !POWERSHELL_EXEC! -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\main.ps1 -u
+set-ExecutionPolicy RemoteSigned
 pause
