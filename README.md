@@ -4,7 +4,7 @@
 Pallas-Bot快速安装助手
 
 # 建议的配置
-Windows 8 或 WindowsServer2016 或以上的64位系统
+Windows 8 或 WindowsServer2016 或以上的64位系统（因为python3.7.3只支持到这）
 
 （32位的mongodb我只能找到3.2.22版本的，不保证能与Pallas兼容）~~真的有支持32位的必要吗~~
 
@@ -13,15 +13,18 @@ Windows 8 或 WindowsServer2016 或以上的64位系统
 硬盘空间 3 GB 或以上
 
 ## 运行环境
+nonebot运行环境要求：
+
 python 版本 >= 3.7.3
 
-如果没有安装python，脚本会自动安装 3.9.9 版本
+（如果没有安装python，脚本会自动安装 3.9.9 版本）
 
 # TODO
-- [ ] 自动下载C++ Build Tools
+- [x] 自动下载C++ Build Tools
 - [x] 自动下载Mongodb
-- [ ] 自动启动Mongodb服务
+- [x] 自动启动Mongodb服务
 - [ ] 适配Linux ~~你都用Linux了，为什么不直接看手动部署手册~~ 
+- [ ] 写食用说明
 
 # 相关内容
 Pallas-Bot项目地址：
