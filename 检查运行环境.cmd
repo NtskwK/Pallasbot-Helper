@@ -29,10 +29,7 @@ if errorlevel 1 (
     )
 )
 
-set-ExecutionPolicy Bypass
+!POWERSHELL_EXEC! -noprofile -command "&{ start-process powershell -ArgumentList {-Command 'set-ExecutionPolicy Bypass' } -verb RunAs }" 
 !POWERSHELL_EXEC! -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\main.ps1 -t
-
-
 echo "任务结束"
 pause
-set-ExecutionPolicy RemoteSigned

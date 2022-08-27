@@ -5,6 +5,7 @@
 	exit
 }
 
+set-ExecutionPolicy RemoteSigned
 
 $Host.UI.RawUI.WindowTitle = 'PallasHelper'
 
@@ -13,8 +14,8 @@ Write-Host "正在检测 PallasBoty 和 Pallas-Bot 必须的依赖项"
 
 $PythonURL = "https://repo.huaweicloud.com/python/3.9.9/python-3.9.9.exe"
 $GitURL = "https://repo.huaweicloud.com/git-for-windows/v2.37.1.windows.1/MinGit-2.37.1-32-bit.zip"
-$MongodbURL = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-6.0.0-signed.msi"
-$CppURL = "https://myvs.download.prss.microsoft.com/dbazure/mu_visual_cpp_build_tools_2015_update_3_x64_dvd_dfd9a39c.iso?t=2d9c8bc8-eb35-4d1f-a0e2-962fc2463acc'&'e=1660583046'&'h=95cab42736b0cd8ed7679c6ee95d6b00c939abf58473188a97e3cc339535f81b'&'su=1"
+#$MongodbURL = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-6.0.0-signed.msi"
+#$CppURL = "https://myvs.download.prss.microsoft.com/dbazure/mu_visual_cpp_build_tools_2015_update_3_x64_dvd_dfd9a39c.iso?t=2d9c8bc8-eb35-4d1f-a0e2-962fc2463acc&e=1660583046&h=95cab42736b0cd8ed7679c6ee95d6b00c939abf58473188a97e3cc339535f81b&su=1"
 $FfmpegURL = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z"
 $ZipURL = "https://www.7-zip.org/a/7zr.exe"
 
@@ -71,30 +72,113 @@ if (!$PSScriptRoot)
 
 cd -LiteralPath "$PSScriptRoot"
 
+
+# PowerShell multi-threaded download by 小透明・宸
+function PartiallyDownload-File([String]$Uri, [String]$OutFile, [Int64]$Start, [Int64]$End = 0, [String]$UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36') {
+    [Net.ServicePointManager]::DefaultConnectionLimit = [Int32]::MaxValue
+    $Request = [Net.WebRequest]::Create($Uri)
+    if ($End) {
+        $Request.AddRange($Start, $End)
+    }
+    else {
+        $Request.AddRange($Start)
+    }
+    $Request.UserAgent = $UserAgent
+    $Request.Proxy = $null
+    $Response = $Request.GetResponse()
+    $Stream = $Response.GetResponseStream()
+    $File = [IO.File]::Create($OutFile)
+    $Stream.CopyTo($File)
+    $File.Close()
+    $Stream.Close()
+    $Response.Close()
+}
+
+function Merge-File([String[]]$Source, [String]$Destination) {
+    $Source = $Source.Clone()
+    for ($i = 0; $i -lt $Source.Length; $i++) {
+        $Source[$i] = '"' + $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Source[$i]) + '"'
+    }
+    cmd /c copy /b /y ($Source -join '+') $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Destination) | Out-Null
+}
+
+function MultiThreadDownload-File([String]$Uri, [String]$OutFile, [Int32]$ThreadCount = 4, [Int32]$MinSliceSize = 256KB, [String]$UserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36') {
+    [Net.ServicePointManager]::DefaultConnectionLimit = [Int32]::MaxValue
+    [Int64]$Length = (Invoke-WebRequest $Uri -Method Head -UseBasicParsing -Proxy $null).Headers.'Content-Length'
+    [String[]]$Part = @()
+    [Int64[]]$Start = @()
+    [Int64[]]$End = @()
+    [Management.Automation.PowerShell[]]$Job = @()
+    [Object[]]$Handle = @()
+    if (($MinSliceSize * $ThreadCount) -gt $Length) { $ThreadCount = [Math]::Floor($Length / $MinSliceSize) }
+
+    for ($i = 0; $i -lt $ThreadCount; $i++) {
+        $Start += $End[$i - 1] + [Int64](!!$i)
+        $End += [Math]::Round($Length / $ThreadCount * ($i + 1))
+        $Part += $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath([GUID]::NewGuid().ToString('N') + '.bin')
+        $Job += [PowerShell]::Create().AddScript(${Function:PartiallyDownload-File}).AddParameter('Uri', $Uri).AddParameter('OutFile', $Part[$i]).AddParameter('Start', $Start[$i]).AddParameter('End', $End[$i]).AddParameter('UserAgent', $UserAgent)
+        $Handle += $Job[$i].BeginInvoke()
+    }
+
+    [Double]$Progress = 0
+    [Int32]$Interval = 200
+    [Boolean]$Complete = $false
+    while (!$Complete) {
+        Start-Sleep -Milliseconds $Interval
+
+        $Complete = $true
+        for ($i = 0; $i -lt $ThreadCount; $i++) {
+            if (!$Handle[$i].IsCompleted) {
+                $Complete = $false
+                break
+            }
+        }
+
+        for ($i = 0; $i -lt $ThreadCount; $i++) {
+            if (!(Test-Path $Part[$i])) { continue }
+            $Progress = (Get-Item $Part[$i]).Length / ($End[$i] - $Start[$i] + 1) * 100
+            Write-Progress -Id $i -Activity ('Thread #{0} {1} - {2}' -f $i, $Start[$i], $End[$i]) -Status ('{0} / {1} {2:f2}%' -f (Get-Item $Part[$i]).Length, ($End[$i] - $Start[$i] + 1), $Progress) -PercentComplete $Progress
+        }
+    }
+
+    for ($i = 0; $i -lt $ThreadCount; $i++) {
+        Write-Progress -Id $i -Activity ('Thread {0} - {1}' -f $Start[$i], $End[$i]) -Completed
+        $Job[$i].EndInvoke($Handle[$i])
+        $Job[$i].Runspace.Close()
+        $Job[$i].Dispose()
+    }
+
+    Merge-File -Source $Part -Destination $OutFile
+    foreach ($p in $Part) { Remove-Item $p }
+}
+
+
+#下载文件
 function DownloadFile($url, $targetFile)
 {
-   $uri = New-Object "System.Uri" "$url"
-   $request = [System.Net.HttpWebRequest]::Create($uri)
-   $request.set_Timeout(15000) #15 second timeout
-   $response = $request.GetResponse()
-   $totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
-   $responseStream = $response.GetResponseStream()
-   $targetStream = New-Object -TypeName System.IO.FileStream -ArgumentList $targetFile, Create
-   $buffer = new-object byte[] 256KB
-   $count = $responseStream.Read($buffer,0,$buffer.length)
-   $downloadedBytes = $count
-   while ($count -gt 0)
-   {
-       $targetStream.Write($buffer, 0, $count)
-       $count = $responseStream.Read($buffer,0,$buffer.length)
-       $downloadedBytes = $downloadedBytes + $count
-       Write-Progress -activity "正在下载文件 '$($url.split('/') | Select -Last 1)'" -Status "已下载 ($([System.Math]::Floor($downloadedBytes/1024))K of $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
-   }
-   Write-Progress -activity "文件 '$($url.split('/') | Select -Last 1)' 下载已完成" -Status "下载已完成" -Completed
-   $targetStream.Flush()
-   $targetStream.Close()
-   $targetStream.Dispose()
-   $responseStream.Dispose()
+	$uri = New-Object "System.Uri" "$url"
+	$request = [System.Net.HttpWebRequest]::Create($uri)
+	$request.set_Timeout(15000) #15 second timeout
+	$response = $request.GetResponse()
+	$totalLength = [System.Math]::Floor($response.get_ContentLength()/1024)
+	$responseStream = $response.GetResponseStream()
+	$targetStream = New-Object -TypeName System.IO.FileStream -ArgumentList $targetFile, Create
+	$buffer = new-object byte[] 256KB
+	$count = $responseStream.Read($buffer,0,$buffer.length)
+	$downloadedBytes = $count
+	while ($count -gt 0)
+	{
+		$targetStream.Write($buffer, 0, $count)
+		$count = $responseStream.Read($buffer,0,$buffer.length)
+		$downloadedBytes = $downloadedBytes + $count
+		Write-Progress -activity "正在下载文件 '$($url.split('/') | Select -Last 1)'" -Status "已下载 ($([System.Math]::Floor($downloadedBytes/1024))K of $($totalLength)K): " -PercentComplete ((([System.Math]::Floor($downloadedBytes/1024)) / $totalLength)  * 100)
+	}
+	Write-Progress -activity "文件 '$($url.split('/') | Select -Last 1)' 下载已完成" -Status "下载已完成" -Completed
+	$targetStream.Flush()
+	$targetStream.Close()
+	$targetStream.Dispose()
+	$responseStream.Dispose()
+
 }
 
 Write-Host "PallasBot启动脚本"
@@ -212,6 +296,7 @@ if (-Not (Test-Path -Path ".\nonebotPallas\bot.py" -PathType Leaf))
 
 Write-Host "Git: $GIT" -ForegroundColor green
 cd "$PSScriptRoot\nonebotPallas"
+#启动向导参数
 if (($args[0] -eq "--update") -or ($args[0] -eq "-u"))
 {
 
@@ -265,13 +350,17 @@ elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 		}
 	}
 
+	cd ..
+	mkdir cache
+	cd cache
+
 	Write-Host "即将下载Microsoft Visual C++ Build Tools 14.0"
 	Write-Host "温馨提示：需要安装的是 “构建工具” 不是 “运行库” ！" -ForegroundColor red
 	$value = Read-Host -Prompt "如果你已经安装过了Microsoft Visual C++ Build Tools 14.0 ，可以输入already跳过安装（输入其他内容则将开始下载）"
 	if( -Not ($value -match '^already')){
 		Write-Host "开始下载Microsoft Visual C++ Build Tools，请耐心等待（这个过程大约需要3-15分钟，依网络状况而定）"
-		powershell curl -o "$PSScriptRoot\visual_cpp_build_tools_2015_update_3_x64_dvd.iso" "$CppURL"
-		Write-Host "Microsoft Visual C++ Build Tools 14.0下载已完成,请按照目录内的“食用说明.pdf”所示，完成MongoDB的安装"
+		MultiThreadDownload-File -Uri 'https://myvs.download.prss.microsoft.com/dbazure/mu_visual_cpp_build_tools_2015_update_3_x64_dvd_dfd9a39c.iso?t=2d9c8bc8-eb35-4d1f-a0e2-962fc2463acc&e=1660583046&h=95cab42736b0cd8ed7679c6ee95d6b00c939abf58473188a97e3cc339535f81b&su=1' -OutFile '$PSScriptRoot\visual_cpp_build_tools_2015_update_3_x64_dvd.iso' -ThreadCount 8 -MinSliceSize 128MB
+		Write-Host "Microsoft Visual C++ Build Tools 14.0下载已完成,请按照目录内的“食用说明.pdf”所示，完成安装"
 	}
 
 	Write-Host "Pallas-Bot将会使用MongoDB存储数据（请务必安装MongoDB）"
@@ -280,13 +369,14 @@ elseif (($args[0] -eq "--revert") -or ($args[0] -eq "-t"))
 		Write-Host "开始下载MongoDB，请耐心等待（这个过程大约需要3-15分钟，依网络状况而定）"
 		Write-Host "如果需要手动下载并安装MongoDB请参考以下链接"
 		Write-Host "https://www.runoob.com/mongodb/mongodb-window-install.html"
-		curl -o "$PSScriptRoot\Mongodb-6.0.0-windows-amd64-setup.msi" "$MongodbURL"
+		MultiThreadDownload-File -Uri 'https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-6.0.0-signed.msi' -OutFile '$PSScriptRoot\Mongodb-6.0.0-windows-amd64-setup.msi' -ThreadCount 4 -MinSliceSize 100MB
 		Write-Host "MongoDB下载已完成,请按照目录内的“食用说明.pdf”所示，完成MongoDB的安装"
 	}else{
 		Write-Host "跳过MongoDB安装"
 	}
 	$DB = 1
 	Write-Host "已完成对运行环境的检查"
+	cd ..
 }
 else
 {
@@ -303,7 +393,7 @@ else
     Write-Host "正在加载$PSScriptRoot"
 	nb run
 }
-if ($DB == 0) {
+if ($DB -eq 0) {
 	net stop MongoDB
 }
 	
