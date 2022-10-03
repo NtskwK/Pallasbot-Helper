@@ -23,8 +23,9 @@ python 版本 >= 3.7.3
 - [x] 自动下载C++ Build Tools
 - [x] 自动下载Mongodb
 - [x] 自动启动Mongodb服务
-- [ ] 适配Linux ~~你都用Linux了，为什么不直接看手动部署手册~~ 
-- [ ] 写食用说明
+- [ ] ~~适配Linux 你都用Linux了，为什么不直接看手动部署手册~~ 
+（不写linux版了，直接上Docker吧）
+- [x] 写食用说明
 
 # 相关内容
 Pallas-Bot项目地址：
